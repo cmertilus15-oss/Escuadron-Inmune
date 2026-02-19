@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Escuadrón Inmune - Sistema Linfático</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Three.js para el modelo 3D (r128) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <!-- Canvas Confetti para el minijuego -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    
+    <!-- FontAwesome para iconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Fuentes divertidas de Google -->
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Nunito:wght@400;600;800&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary: #EF476F; /* Rojo sangre/inmune */
+            --secondary: #06D6A0; /* Verde linfático */
+            --accent: #FFD166; /* Amarillo defensas */
+            --dark: #073B4C;
+            --light: #F8F9FA;
+        }
+
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: #f0fdfa;
+            background-image: radial-gradient(#ccfbf1 2px, transparent 2px);
+            background-size: 30px 30px;
+            color: var(--dark);
+            overflow-x: hidden;
+        }
+
+        h1, h2, h3, h4 {
+            font-family: 'Fredoka', sans-serif;
+        }
+
+        .card-pop {
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease;
+        }
+        .card-pop:hover {
+            transform: translateY(-10px) scale(1.02);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.1);
+        }
+
+        /* Animación de flotación */
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+        .floating {
+            animation: float 4s ease-in-out infinite;
+        }
+
+        /* Estilos específicos del Minijuego Drag & Drop */
+        .draggable-item {
+            cursor: grab;
+            user-select: none;
+            transition: transform 0.2s;
+        }
+        .draggable-item:active {
+            cursor: grabbing;
+            transform: scale(0.95);
+        }
+        .dropzone {
+            border: 4px dashed var(--secondary);
+            transition: all 0.3s ease;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 200' fill='none' stroke='%239ca3af' stroke-width='2'%3E%3Cpath d='M50 20 C60 20, 65 30, 65 40 C65 50, 50 60, 50 60 C50 60, 35 50, 35 40 C35 30, 40 20, 50 20 Z' /%3E%3Cpath d='M35 55 C20 60, 10 80, 15 110 C15 110, 30 110, 35 85' /%3E%3Cpath d='M65 55 C80 60, 90 80, 85 110 C85 110, 70 110, 65 85' /%3E%3Cpath d='M35 85 L35 140 C35 140, 40 190, 45 190 C50 190, 45 140, 45 140 L50 140 L50 190 C50 190, 55 190, 60 190 C65 190, 65 140, 65 140 L65 85' /%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: contain;
+        }
+        .dropzone.drag-over {
+            background-color: rgba(6, 214, 160, 0.1);
+            border-color: var(--primary);
+            transform: scale(1.02);
+        }
+
+        /* Botones estilo burbuja */
+        .btn-bubble {
+            background: linear-gradient(135deg, var(--secondary), #05b586);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            padding: 12px 24px;
+            font-weight: 800;
+            font-size: 1.1rem;
+            box-shadow: 0 6px 0 #04926c, 0 10px 20px rgba(0,0,0,0.2);
+            transition: all 0.1s;
+            cursor: pointer;
+        }
+        .btn-bubble:active {
+            transform: translateY(6px);
+            box-shadow: 0 0px 0 #04926c, 0 5px 10px rgba(0,0,0,0.2);
+        }
+        .btn-bubble.pink {
+            background: linear-gradient(135deg, var(--primary), #ff6b8f);
+            box-shadow: 0 6px 0 #c92a4e, 0 10px 20px rgba(0,0,0,0.2);
+        }
+        .btn-bubble.pink:active {
+            box-shadow: 0 0px 0 #c92a4e, 0 5px 10px rgba(0,0,0,0.2);
+        }
+
+        /* Canvas 3D */
+        #canvas-container {
+            width: 100%;
+            height: 400px;
+            border-radius: 20px;
+            overflow: hidden;
+            background: radial-gradient(circle at center, #111827, #000000);
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.7);
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <!-- Navegación/Cabecera -->
+    <header class="max-w-5xl mx-auto flex flex-col md:flex-row justify-between items-center bg-white p-6 rounded-3xl shadow-lg border-4 border-white mb-8">
+        <div class="flex items-center gap-4 mb-4 md:mb-0">
+            <div class="w-16 h-16 bg-[#EF476F] rounded-full flex items-center justify-center text-4xl shadow-inner floating">
+                🛡️
+            </div>
+            <div>
+                <h1 class="text-3xl md:text-4xl font-bold text-[#073B4C]">Escuadrón Inmune</h1>
+                <p class="text-gray-500 font-semibold">El Sistema Linfático en Acción</p>
+            </div>
+        </div>
+        <nav class="flex gap-3">
+            <a href="#explora" class="px-4 py-2 bg-gray-100 rounded-full font-bold text-gray-600 hover:bg-[#06D6A0] hover:text-white transition">Defensas 3D</a>
+            <a href="#juego" class="px-4 py-2 bg-gray-100 rounded-full font-bold text-gray-600 hover:bg-[#EF476F] hover:text-white transition">Arma tu Ejército</a>
+            <a href="#quiz" class="px-4 py-2 bg-gray-100 rounded-full font-bold text-gray-600 hover:bg-[#FFD166] hover:text-gray-800 transition">Quiz</a>
+        </nav>
+    </header>
+
+    <main class="max-w-5xl mx-auto space-y-12">
+
+        <!-- SECCIÓN 1: Explorador 3D -->
+        <section id="explora" class="bg-white p-6 rounded-3xl shadow-xl border-t-8 border-[#06D6A0]">
+            <h2 class="text-3xl mb-4 text-[#073B4C]"><i class="fa-solid fa-virus-slash text-[#06D6A0] mr-2"></i> Combate Microscópico 3D</h2>
+            <p class="mb-4 text-lg">Aquí vemos a un valiente <strong>Macrófago</strong> (glóbulo blanco) persiguiendo bacterias enemigas. Arrastra para girar la vista.</p>
+            
+            <div class="grid md:grid-cols-3 gap-6">
+                <!-- Contenedor 3D -->
+                <div class="md:col-span-2 relative">
+                    <div id="canvas-container"></div>
+                    <div class="absolute bottom-4 left-4 bg-white/80 px-4 py-2 rounded-full font-bold text-sm shadow">
+                        <i class="fa-solid fa-hand-pointer mr-2"></i> Arrastra para girar
+                    </div>
+                </div>
+                <!-- Tarjetas de info -->
+                <div class="flex flex-col gap-4">
+                    <div class="bg-white p-4 rounded-2xl card-pop border-l-8 border-[#F8F9FA] shadow-md">
+                        <h3 class="font-bold text-xl text-gray-700">Macrófagos (Blancos)</h3>
+                        <p class="text-sm mt-1">Son los "comedores" del sistema inmune. Envuelven y destruyen a las bacterias o virus invasores.</p>
+                    </div>
+                    <div class="bg-[#e6fffa] p-4 rounded-2xl card-pop border-l-8 border-[#06D6A0] shadow-md">
+                        <h3 class="font-bold text-xl text-[#04926c]">Bacterias (Verdes)</h3>
+                        <p class="text-sm mt-1">Patógenos que intentan invadir el cuerpo. El sistema linfático las atrapa y las destruye.</p>
+                    </div>
+                    <div class="bg-[#fff0f3] p-4 rounded-2xl card-pop border-l-8 border-[#EF476F] shadow-md">
+                        <h3 class="font-bold text-xl text-[#c92a4e]">Linfocitos (Refuerzos)</h3>
+                        <p class="text-sm mt-1">Células especializadas (T y B) que fabrican anticuerpos y recuerdan a los virus para el futuro.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECCIÓN 2: Minijuego Manualidad Digital -->
+        <section id="juego" class="bg-white p-6 md:p-10 rounded-3xl shadow-xl border-t-8 border-[#EF476F]">
+            <div class="text-center mb-8">
+                <h2 class="text-3xl text-[#073B4C] mb-2"><i class="fa-solid fa-shield-halved text-[#EF476F] mr-2"></i> Arma tu Sistema Linfático</h2>
+                <p class="text-lg">El sistema linfático es una red de defensa. Arrastra los órganos clave a la silueta del cuerpo.</p>
+            </div>
+
+            <div class="flex flex-col md:flex-row gap-8 items-center justify-center">
+                <!-- Panel de piezas -->
+                <div class="flex flex-wrap md:flex-col gap-4 bg-gray-50 p-6 rounded-2xl border-2 border-dashed border-gray-300 w-full md:w-1/3" id="organs-container">
+                    
+                    <div class="draggable-item bg-white p-3 rounded-xl shadow-md cursor-grab border-2 border-[#EF476F] flex items-center gap-3 w-full" draggable="true" id="pieza-bazo">
+                        <div class="w-12 h-8 bg-[#EF476F] rounded-full flex items-center justify-center shadow-inner" style="border-radius: 50% 20% 50% 20%;"></div>
+                        <div>
+                            <span class="font-bold text-gray-700 block">El Bazo</span>
+                            <span class="text-xs text-gray-500">Filtra la sangre</span>
+                        </div>
+                    </div>
+
+                    <div class="draggable-item bg-white p-3 rounded-xl shadow-md cursor-grab border-2 border-[#FFD166] flex items-center gap-3 w-full" draggable="true" id="pieza-timo">
+                        <div class="w-10 h-10 bg-[#FFD166] rounded-t-xl rounded-b-md flex items-center justify-center shadow-inner relative">
+                            <div class="w-1 h-6 bg-yellow-600 opacity-20 absolute"></div>
+                        </div>
+                        <div>
+                            <span class="font-bold text-gray-700 block">El Timo</span>
+                            <span class="text-xs text-gray-500">Entrena Linfocitos T</span>
+                        </div>
+                    </div>
+
+                    <div class="draggable-item bg-white p-3 rounded-xl shadow-md cursor-grab border-2 border-[#06D6A0] flex items-center gap-3 w-full" draggable="true" id="pieza-ganglio">
+                        <div class="w-8 h-10 bg-[#06D6A0] rounded-full flex items-center justify-center shadow-inner"></div>
+                        <div>
+                            <span class="font-bold text-gray-700 block">Ganglio Linfático</span>
+                            <span class="text-xs text-gray-500">Atrapa gérmenes</span>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Zona de caída (Cuerpo vacío) -->
+                <div class="w-full md:w-2/3 flex justify-center">
+                    <div id="body-dropzone" class="dropzone w-64 h-96 rounded-xl bg-gray-50 relative flex flex-col items-center justify-center shadow-inner overflow-hidden">
+                        <div class="absolute bg-white/80 p-2 rounded text-center text-gray-500 font-bold z-10 pointer-events-none" id="dropzone-text">
+                            Arrastra los órganos <br> a la silueta
+                        </div>
+                        <!-- Contenedor interno donde se soltarán las piezas -->
+                        <div id="dropped-organs" class="absolute inset-0 flex flex-col items-center justify-center gap-8 p-4 pointer-events-none z-20"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-center mt-8">
+                <button id="btn-reset-game" class="btn-bubble pink text-sm"><i class="fa-solid fa-rotate-right"></i> Reiniciar Organos</button>
+            </div>
+        </section>
+
+        <!-- SECCIÓN 3: Quiz Interactivo -->
+        <section id="quiz" class="bg-white p-6 md:p-10 rounded-3xl shadow-xl border-t-8 border-[#FFD166] mb-12 relative overflow-hidden">
+            <!-- Decoración de fondo -->
+            <div class="absolute -right-10 -top-10 text-9xl opacity-10"><i class="fa-solid fa-truck-medical"></i></div>
+
+            <h2 class="text-3xl text-[#073B4C] mb-6 relative z-10"><i class="fa-solid fa-clipboard-check text-[#FFD166] mr-2"></i> Evaluación Inmune</h2>
+            
+            <div id="quiz-container" class="relative z-10 max-w-2xl mx-auto text-center">
+                <!-- Pantalla de Inicio -->
+                <div id="quiz-start">
+                    <p class="text-xl mb-6">¿Qué tanto sabes sobre tus defensas?</p>
+                    <button id="btn-start-quiz" class="btn-bubble text-xl"><i class="fa-solid fa-play mr-2"></i> Iniciar Quiz</button>
+                </div>
+
+                <!-- Pantalla de Pregunta -->
+                <div id="quiz-question-screen" class="hidden">
+                    <div class="mb-4 text-sm font-bold text-gray-500 uppercase tracking-wider">Pregunta <span id="q-current">1</span> de <span id="q-total">3</span></div>
+                    <h3 id="question-text" class="text-2xl font-bold mb-8 text-[#073B4C]">¿Pregunta?</h3>
+                    <div id="answers-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Botones de respuesta inyectados por JS -->
+                    </div>
+                </div>
+
+                <!-- Pantalla de Resultados -->
+                <div id="quiz-result-screen" class="hidden">
+                    <div class="text-6xl mb-4 floating" id="result-emoji">🎖️</div>
+                    <h3 class="text-3xl font-bold mb-2">¡Reporte Médico Listo!</h3>
+                    <p class="text-xl mb-6">Respuestas correctas: <span id="score-text" class="font-bold text-[#EF476F]">0</span> / 3</p>
+                    <button id="btn-restart-quiz" class="btn-bubble"><i class="fa-solid fa-rotate-left mr-2"></i> Volver a intentar</button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- SCRIPTS -->
+    <script>
+        // ==========================================
+        // 1. MODELO 3D CON THREE.JS (Macrófago vs Bacterias)
+        // ==========================================
+        function init3D() {
+            const container = document.getElementById('canvas-container');
+            const scene = new THREE.Scene();
+            
+            // Cámara
+            const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+            camera.position.z = 20;
+
+            // Renderizador
+            const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            container.appendChild(renderer.domElement);
+
+            // Luces
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambientLight);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+            dirLight.position.set(10, 20, 15);
+            scene.add(dirLight);
+
+            // --- Creación de los Modelos ---
+            const immuneGroup = new THREE.Group();
+
+            // 1. El Macrófago (Glóbulo Blanco gigante e irregular)
+            const macroGeo = new THREE.IcosahedronGeometry(4, 2); // Textura un poco "rugosa"
+            const macroMat = new THREE.MeshPhongMaterial({ 
+                color: 0xf8f9fa, 
+                shininess: 30,
+                flatShading: true // Le da un aspecto celular interesante
+            });
+            const macrophage = new THREE.Mesh(macroGeo, macroMat);
+            immuneGroup.add(macrophage);
+
+            // 2. Bacterias (Usando esferas escaladas para crear píldoras/cápsulas)
+            const bacteriaList = [];
+            function createBacteria(x, y, z) {
+                // Reemplazado CapsuleGeometry por SphereGeometry escalado para compatibilidad con r128
+                const bacGeo = new THREE.SphereGeometry(0.6, 16, 16);
+                const bacMat = new THREE.MeshPhongMaterial({ color: 0x06D6A0, shininess: 80 });
+                const bacteria = new THREE.Mesh(bacGeo, bacMat);
+                
+                // Escalar la esfera en el eje Y para darle forma de bacteria alargada
+                bacteria.scale.set(1, 2.5, 1);
+                
+                bacteria.position.set(x, y, z);
+                
+                // Darles un eje de rotación aleatorio para la animación
+                bacteria.userData = {
+                    rx: Math.random() * 0.05,
+                    ry: Math.random() * 0.05,
+                    floatingSpeed: Math.random() * 0.02 + 0.01,
+                    baseY: y
+                };
+                return bacteria;
+            }
+
+            const b1 = createBacteria(6, 2, 2);
+            const b2 = createBacteria(-5, -3, 1);
+            const b3 = createBacteria(3, -4, -2);
+            
+            bacteriaList.push(b1, b2, b3);
+            immuneGroup.add(b1);
+            immuneGroup.add(b2);
+            immuneGroup.add(b3);
+
+            scene.add(immuneGroup);
+
+            // Variables para interactividad
+            let isDragging = false;
+            let previousMousePosition = { x: 0, y: 0 };
+
+            renderer.domElement.addEventListener('mousedown', (e) => { isDragging = true; });
+            renderer.domElement.addEventListener('mousemove', (e) => {
+                if (isDragging) {
+                    const deltaMove = {
+                        x: e.offsetX - previousMousePosition.x,
+                        y: e.offsetY - previousMousePosition.y
+                    };
+                    immuneGroup.rotation.y += deltaMove.x * 0.01;
+                    immuneGroup.rotation.x += deltaMove.y * 0.01;
+                }
+                previousMousePosition = { x: e.offsetX, y: e.offsetY };
+            });
+            window.addEventListener('mouseup', () => { isDragging = false; });
+
+            // Soporte táctil
+            renderer.domElement.addEventListener('touchstart', (e) => {
+                isDragging = true;
+                previousMousePosition = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            }, {passive: false});
+            renderer.domElement.addEventListener('touchmove', (e) => {
+                if (isDragging) {
+                    e.preventDefault();
+                    const deltaMove = {
+                        x: e.touches[0].clientX - previousMousePosition.x,
+                        y: e.touches[0].clientY - previousMousePosition.y
+                    };
+                    immuneGroup.rotation.y += deltaMove.x * 0.01;
+                    immuneGroup.rotation.x += deltaMove.y * 0.01;
+                    previousMousePosition = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                }
+            }, {passive: false});
+            window.addEventListener('touchend', () => { isDragging = false; });
+
+            // Animación (Glóbulo blanco palpita, bacterias flotan)
+            let time = 0;
+            function animate() {
+                requestAnimationFrame(animate);
+                time += 0.05;
+
+                // Efecto de "respiración" o palpitar del macrófago
+                const scale = 1 + Math.sin(time * 0.5) * 0.05;
+                macrophage.scale.set(scale, scale, scale);
+
+                // Rotación suave general si no se está arrastrando
+                if (!isDragging) {
+                    immuneGroup.rotation.y += 0.002;
+                }
+
+                // Animar bacterias independientemente
+                bacteriaList.forEach(bac => {
+                    bac.rotation.x += bac.userData.rx;
+                    bac.rotation.y += bac.userData.ry;
+                    bac.position.y = bac.userData.baseY + Math.sin(time * bac.userData.floatingSpeed * 10) * 0.5;
+                });
+
+                renderer.render(scene, camera);
+            }
+            animate();
+
+            // Resize
+            window.addEventListener('resize', () => {
+                camera.aspect = container.clientWidth / container.clientHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(container.clientWidth, container.clientHeight);
+            });
+        }
+
+        // ==========================================
+        // 2. MINIJUEGO: MANUALIDAD DIGITAL (Sistema Linfático)
+        // ==========================================
+        function initDragAndDrop() {
+            const draggables = document.querySelectorAll('.draggable-item');
+            const dropzone = document.getElementById('body-dropzone');
+            const droppedItemsContainer = document.getElementById('dropped-organs');
+            const droptext = document.getElementById('dropzone-text');
+            const btnReset = document.getElementById('btn-reset-game');
+            const originalContainer = document.getElementById('organs-container');
+            
+            let piecesInPlace = 0;
+            const totalPieces = draggables.length;
+
+            draggables.forEach(draggable => {
+                draggable.addEventListener('dragstart', (e) => {
+                    draggable.classList.add('opacity-50');
+                    e.dataTransfer.setData('text/plain', draggable.id);
+                });
+
+                draggable.addEventListener('dragend', () => {
+                    draggable.classList.remove('opacity-50');
+                });
+            });
+
+            dropzone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropzone.classList.add('drag-over');
+            });
+
+            dropzone.addEventListener('dragleave', () => {
+                dropzone.classList.remove('drag-over');
+            });
+
+            dropzone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropzone.classList.remove('drag-over');
+                
+                const id = e.dataTransfer.getData('text');
+                const draggableElement = document.getElementById(id);
+                
+                if (draggableElement && draggableElement.parentElement === originalContainer) {
+                    
+                    // Diseños visuales de los órganos al soltarlos
+                    let iconHtml = '';
+                    if(id==='pieza-bazo') iconHtml = '<div class="w-16 h-10 bg-[#EF476F] shadow-lg border-2 border-white animate-bounce" style="border-radius: 50% 20% 50% 20%;"></div><span class="text-xs font-bold text-gray-700 bg-white/80 px-2 rounded">Bazo</span>';
+                    if(id==='pieza-timo') iconHtml = '<div class="w-12 h-12 bg-[#FFD166] rounded-t-xl rounded-b-md border-2 border-white shadow-lg flex items-center justify-center"><div class="w-1 h-8 bg-yellow-600 opacity-30"></div></div><span class="text-xs font-bold text-gray-700 bg-white/80 px-2 rounded mt-1">Timo</span>';
+                    if(id==='pieza-ganglio') iconHtml = '<div class="w-10 h-12 bg-[#06D6A0] rounded-full border-2 border-white shadow-lg"></div><span class="text-xs font-bold text-gray-700 bg-white/80 px-2 rounded mt-1">Ganglio</span>';
+
+                    const newEl = document.createElement('div');
+                    newEl.className = 'flex flex-col items-center';
+                    newEl.innerHTML = iconHtml;
+                    droppedItemsContainer.appendChild(newEl);
+                    
+                    draggableElement.style.display = 'none';
+                    piecesInPlace++;
+                    droptext.style.display = 'none';
+
+                    if (piecesInPlace === totalPieces) {
+                        setTimeout(() => {
+                            confetti({
+                                particleCount: 120,
+                                spread: 80,
+                                origin: { y: 0.6 },
+                                colors: ['#EF476F', '#06D6A0', '#FFD166']
+                            });
+                            droptext.innerHTML = "¡Defensas Activas! 🛡️";
+                            droptext.style.display = 'block';
+                            droptext.classList.add('bg-green-100', 'text-green-800');
+                            dropzone.classList.add('bg-green-50');
+                        }, 300);
+                    }
+                }
+            });
+
+            btnReset.addEventListener('click', () => {
+                droppedItemsContainer.innerHTML = '';
+                draggables.forEach(el => el.style.display = 'flex');
+                piecesInPlace = 0;
+                droptext.innerHTML = "Arrastra los órganos <br> a la silueta";
+                droptext.style.display = 'block';
+                droptext.classList.remove('bg-green-100', 'text-green-800');
+                dropzone.classList.remove('bg-green-50');
+            });
+        }
+
+        // ==========================================
+        // 3. QUIZ INTERACTIVO (Sistema Inmune)
+        // ==========================================
+        function initQuiz() {
+            const questions = [
+                {
+                    q: "¿Qué líquido especial viaja por los vasos linfáticos?",
+                    options: ["Sangre roja", "Linfa", "Saliva", "Plasma"],
+                    correct: 1
+                },
+                {
+                    q: "¿Qué órgano sirve como 'filtro' para atrapar virus y bacterias?",
+                    options: ["Los Pulmones", "El Corazón", "El Ganglio Linfático", "El Estómago"],
+                    correct: 2
+                },
+                {
+                    q: "Los Glóbulos Blancos (como los macrófagos) sirven para...",
+                    options: ["Llevar oxígeno", "Digerir comida", "Defender el cuerpo", "Construir huesos"],
+                    correct: 2
+                }
+            ];
+
+            let currentQuestionIndex = 0;
+            let score = 0;
+
+            const screenStart = document.getElementById('quiz-start');
+            const screenQuestion = document.getElementById('quiz-question-screen');
+            const screenResult = document.getElementById('quiz-result-screen');
+            
+            const btnStart = document.getElementById('btn-start-quiz');
+            const btnRestart = document.getElementById('btn-restart-quiz');
+            
+            const qText = document.getElementById('question-text');
+            const ansContainer = document.getElementById('answers-container');
+            const spanCurrent = document.getElementById('q-current');
+            const spanTotal = document.getElementById('q-total');
+            const spanScore = document.getElementById('score-text');
+            const iconResult = document.getElementById('result-emoji');
+
+            spanTotal.innerText = questions.length;
+
+            btnStart.addEventListener('click', () => {
+                screenStart.classList.add('hidden');
+                screenQuestion.classList.remove('hidden');
+                loadQuestion();
+            });
+
+            btnRestart.addEventListener('click', () => {
+                currentQuestionIndex = 0;
+                score = 0;
+                screenResult.classList.add('hidden');
+                screenQuestion.classList.remove('hidden');
+                loadQuestion();
+            });
+
+            function loadQuestion() {
+                ansContainer.innerHTML = ''; 
+                const data = questions[currentQuestionIndex];
+                
+                spanCurrent.innerText = currentQuestionIndex + 1;
+                qText.innerText = data.q;
+
+                data.options.forEach((opt, index) => {
+                    const btn = document.createElement('button');
+                    btn.className = 'p-4 bg-gray-100 hover:bg-[#06D6A0] hover:text-white rounded-xl text-lg font-bold transition border-2 border-transparent hover:border-[#04926c]';
+                    btn.innerText = opt;
+                    btn.onclick = () => selectAnswer(index);
+                    ansContainer.appendChild(btn);
+                });
+            }
+
+            function selectAnswer(selectedIndex) {
+                const correctIndex = questions[currentQuestionIndex].correct;
+                const buttons = ansContainer.querySelectorAll('button');
+                
+                buttons.forEach(b => b.disabled = true);
+
+                if (selectedIndex === correctIndex) {
+                    buttons[selectedIndex].classList.replace('bg-gray-100', 'bg-green-500');
+                    buttons[selectedIndex].classList.replace('hover:bg-[#06D6A0]', 'text-white');
+                    score++;
+                } else {
+                    buttons[selectedIndex].classList.replace('bg-gray-100', 'bg-red-500');
+                    buttons[selectedIndex].classList.replace('hover:bg-[#06D6A0]', 'text-white');
+                    buttons[correctIndex].classList.replace('bg-gray-100', 'bg-green-500');
+                    buttons[correctIndex].classList.add('text-white');
+                }
+
+                setTimeout(() => {
+                    currentQuestionIndex++;
+                    if (currentQuestionIndex < questions.length) {
+                        loadQuestion();
+                    } else {
+                        showResults();
+                    }
+                }, 1200);
+            }
+
+            function showResults() {
+                screenQuestion.classList.add('hidden');
+                screenResult.classList.remove('hidden');
+                spanScore.innerText = score;
+
+                if (score === questions.length) {
+                    iconResult.innerText = "🛡️";
+                    confetti({ particleCount: 150, spread: 100, origin: { y: 0.6 } });
+                } else if (score > 0) {
+                    iconResult.innerText = "🩹";
+                } else {
+                    iconResult.innerText = "🦠";
+                }
+            }
+        }
+
+        // ==========================================
+        // INICIAR TODO AL CARGAR LA PÁGINA
+        // ==========================================
+        window.onload = function() {
+            init3D();
+            initDragAndDrop();
+            initQuiz();
+        };
+
+    </script>
+</body>
+</html>
